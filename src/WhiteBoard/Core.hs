@@ -190,7 +190,7 @@ storeObject k o =
 
     if shouldAddDirtyItems then
       do
-        wbc <- lift $ lift $ ask
+        wbc <- lift $ ask
         liftIO $ addDirtyItems wbc (refererKeys eo) -- note we use 'eo'(existing object) here
          -- because we don't want to rerun the current storer
       else return ()
@@ -503,7 +503,7 @@ workerThread =
         (Just obj) <- (lift $ atomically $ readDBRef $ getDBRef (show key)) -- :: (Keyable k, WBObj o) => WBMonad k o (Maybe (ObjMeta k o))
 
         --use the key to create a task, and then run it
-        runReaderT (runMaybeT (actionFunc wbc)) (key,obj)
+        runReaderT (actionFunc wbc) (key,obj)
 
         --we did a little bit of work, so we update the stats
         liftIO $ putMVar (schedulerChannel wbc) $ SEWorkerThreadProcessedItem

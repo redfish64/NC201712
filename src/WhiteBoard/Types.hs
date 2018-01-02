@@ -46,7 +46,7 @@ type WBMonad k o = ReaderT (WBConf k o) IO
 {- | this is the monad used within the actionFunc. It can be used to store an object,
      load an object associated to a key, or produce an error (which is the same as storing
      an object, but there for convienience -}
-type WBIMonad k o = MaybeT (ReaderT (k,ObjMeta k o) (WBMonad k o))
+type WBIMonad k o = ReaderT (k,ObjMeta k o) (WBMonad k o)
 
 
 runWBMonad :: (WBConf k o) -> WBMonad k o x -> IO x
