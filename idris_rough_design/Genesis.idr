@@ -73,6 +73,21 @@ transferFunds from to amt _ _ _ =
     in
       [ AlterCommand fromName newFromAccount
         ,AlterCommand fromName newToAccount ]
+
+--TODO 2 to create new accounts, transfer funds to them
+--transferFundsToNewAccount : (from : Ref Account) -> (to : Ref Account) -> (amt : Coins) -> (sig : Signature) -> verifySigTransferFunds sig from to amt = True -> verifySufficientFunds (getRefValue from) amt = True -> List CoreCommand  --TODO 2 CoreCommand should probably be a monad
+-- transferFunds from to amt _ _ _ = 
+--   let 
+--     fromAccount = getRefValue from
+--     toAccount = getRefValue to
+--     (MkRef fromName _) = from
+--     (MkRef toName _) = to
+--     newFromAccount = record { bal = (bal fromAccount) - amt, updInd $= (+1) } fromAccount
+--     newToAccount = record { bal = (bal toAccount) - amt, updInd $= (+1) } toAccount
+--     in
+--       [ AlterCommand fromName newFromAccount
+--         ,AlterCommand fromName newToAccount ]
+
         
 -- --   [ AlterCommand fromName Account (MkAccount ((bal (getRefValue fromName)) - amt) (
  
