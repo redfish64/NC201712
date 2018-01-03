@@ -1,7 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module WhiteBoard.Core(createWBConf,addAnchorObjects,storeObject,loadObject,startWhiteBoard,finishWhiteBoard) where
 
-{- The core system is a set of threads and a ..... TODO 2 finish this documentation
+{- The center of the core system is a WBConf instance, which holds configuration parameters as well as channels for interthread communication.
+
+   When the whiteboard system is started, several worker threads are created, and
+   a single scheduler thread. The scheduler thread is responsible for moving through
+   different states, ie. a processing state, a saving state, an idle state, etc.
+
+   It does this by emptying/filling inChan within the WBConf.
+
+   The worker threads simply read from inChan, write to outChan, and notify the scheduler
+   when they are finished using schedulerChannel. starting, and
+   stopping the worker threads, as core system is a set of threads and a ..... TODO 2 finish this documentation
 This system works by having a single scheduler thread that takes care of when
    worker threads should process items, when they should stop, so we can save intermediate
    data, or write finished results after everything has been processed -}

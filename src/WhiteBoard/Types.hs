@@ -28,15 +28,28 @@ data WBConf k o = WBConf {
   actionFunc :: WBIMonad k o (), -- ^ function that performs an
   -- appropriate task(s) for a WBObj (which would typically load and
   -- store other objects with other keys)
-  inChan :: InChan k, -- ^ Write end of FIFO queue of dirty objects
-  outChan :: OutChan k, -- ^ Read end of FIFO queue of dirty objects
+  inChan :: InChan k, -- ^ Write end of FIFO queue of dirty objects. Filled by the scheduler
+    --thread and read by the worker threads
+  outChan :: OutChan k, -- ^ Read end of FIFO queue of dirty objects. Populated by the
+    --worker threads and read by the scheduler thread
   schedulerChannel :: MVar (SchedulerEvent k) -- ^ Scheduler thread reads from this to handle
-  --various events. Its job is to decide when to stop working and save to the cache
-  -- It's an MVar because the events should happen rarely, and the scheduler shouldn't
-  -- be very busy, so it should happen fast, and therefore is ok to block
+    --various events. It uses this to decide when to stop working and save to the cache
+    --This is how the worker threads communicate to the scheduler thread.
+    -- It's an MVar because the events should happen rarely, and the scheduler shouldn't
+    -- be very busy, so it should happen fast, and therefore is ok to block
   }
 
-data SchedulerEvent k = SEWorkerThreadProcessedItem | SETimerWentOff | AddDirtyItems [k]
+data SchedulerEvent k =
+  SEWorkerThreadProcessedItem -- ^ anytime a worker thread processes an item, it
+  --sends this event. This is necessary because the scheduler thread can't know
+  --when the worker threads are done by monitoring outChan. In other words, both
+  --inChan and outChan could be empty, yet worker threads could still be processing
+  --because they just haven't finished their last item of work.
+  | SETimerWentOff -- ^ the intermediate state is periodically saved to the database
+  --this is accomplished by a timer thread that pings the scheduler thread using
+  --this message type
+  | AddDirtyItems [k]  -- ^ called by the worker thread whenever it makes a
+  --change to an object. Also called when an anchor object (initial object) is added.
   deriving (Show)
 
   
