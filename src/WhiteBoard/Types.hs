@@ -21,6 +21,8 @@ import Data.IORef
 import Control.Monad.Trans.Maybe
 import Data.SortedList as SL
 
+-- | static data for WhiteBoard.  This includes configuration, as well
+--   as other static objects, like references to channels.
 data WBConf k o = WBConf {
   numWorkingThreads :: Int, -- ^ number of threads to spin up for processing  
   timeBetweenCommitsSecs :: Int,  -- ^ time between intermediary commits to disk
@@ -39,6 +41,7 @@ data WBConf k o = WBConf {
     -- be very busy, so it should happen fast, and therefore is ok to block
   }
 
+-- | events messages run by the scheduler
 data SchedulerEvent k =
   SEWorkerThreadProcessedItem -- ^ anytime a worker thread processes an item, it
   --sends this event. This is necessary because the scheduler thread can't know
@@ -52,31 +55,51 @@ data SchedulerEvent k =
   --change to an object. Also called when an anchor object (initial object) is added.
   deriving (Show)
 
+
+--TODO 2 we aren't deleting any old data. We will need to delete data, preferrably
+-- old data first
+
   
 -- | this is just an IO monad with the WBConf data 
 type WBMonad k o = ReaderT (WBConf k o) IO
 
-{- | this is the monad used within the actionFunc. It can be used to store an object,
-     load an object associated to a key, or produce an error (which is the same as storing
-     an object, but there for convienience -}
+{- | this is the monad used within the user-defined actionFunc. It can
+     be used to store an object, or load an object associated to a
+     key.
+
+     It's addition to WBMonad is a reader that provides the current
+     key and object being worked on.
+-}
 type WBIMonad k o = ReaderT (k,ObjMeta k o) (WBMonad k o)
 
 
 runWBMonad :: (WBConf k o) -> WBMonad k o x -> IO x
 runWBMonad wbc m = runReaderT m wbc
 
-whiteBoardKey :: String
-whiteBoardKey = "_WhiteBoard"
+{- | Meta data about the objects within WhiteBoard.
 
+     The objects refered to (aka loaded), and objects stored by the
+     user-defined action func while it's working on a object are saved
+     to the db using this object.
+
+-}
 data ObjMeta k o = ObjMeta {
   key :: k,
   payload :: SortedList o,  -- ^ objects stored to this key.
-  refererKeys :: [k], -- ^ objects that load, or store this object, so if it changes, they become dirty. In the case of storers, if there are multiple stores, we have to report an error, so this keeps track of them as well.
-  referers :: Maybe [ObjMeta k o], -- ^ populated on demand from referersKeys
-  storedObjKeys :: [k], -- ^ objects stored by this object. We need this to be able to clean
-    --up objects, when the objects that are stored change when we rerun.
+  refererKeys :: [k], -- ^ objects that load, or store this object, so
+                      -- if it changes, they become dirty. In the case
+                      -- of storers, if there are multiple stores, we
+                      -- have to report an error, so this keeps track
+                      -- of them as well.
+  referers :: Maybe [ObjMeta k o], -- ^ populated on demand from
+                                   -- referersKeys, not saved to db
+  storedObjKeys :: [k], -- ^ objects stored by this object. We need
+                        -- this to be able to clean up objects, when
+                        -- the objects that are stored change when we
+                        -- rerun.
 
-  storedObjs :: Maybe [ObjMeta k o] -- ^ populated on demand from storedObjsKeys
+  storedObjs :: Maybe [ObjMeta k o] -- ^ populated on demand from
+                                    -- storedObjsKeys. not saved to db
   } deriving (Show,Read)
 
 instance (Ord o, Read o) => Read (SortedList o) where

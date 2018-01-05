@@ -495,7 +495,9 @@ startTimerThread :: Int -> IO () -> IO ThreadId
 startTimerThread waitTimeMicroSecs actionToPerform =
   forkIO $ (threadDelay waitTimeMicroSecs >> actionToPerform)
 
--- | thread for running tasks in the dirty queue
+-- | thread for running tasks in the dirty queue. This simply pulls a
+-- dirty item off the queue, and then performs the (user defined)
+-- action function on it, which in turn loads and stores other objects
 workerThread :: (Keyable k, WBObj o) => WBMonad k o ()
 workerThread =
   do
