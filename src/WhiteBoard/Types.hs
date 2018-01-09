@@ -81,7 +81,6 @@ runWBMonad wbc m = runReaderT m wbc
      The objects refered to (aka loaded), and objects stored by the
      user-defined action func while it's working on a object are saved
      to the db using this object.
-
 -}
 data ObjMeta k o = ObjMeta {
   key :: k,

@@ -210,6 +210,9 @@ storeObject k o =
 
 data LoadResult o = LRSuccess o | LRErrorEmpty | LRErrorMultStorers
 
+-- | called by the user defined action function to load an object
+--   This returns a SortedList because if there are multiple writers
+--   that created different objects, then each distinct object is returned.
 loadObject :: (Keyable k, WBObj o) => k -> WBIMonad k o (SortedList o)
 loadObject k =
   do
