@@ -1,0 +1,233 @@
+2/2/18
+
+We want the thing to be simple. but it's not becoming that. I can't deal with
+a program that is overly complex.
+
+We have a core program, and a bunch of world states.
+
+The world states aren't entirely loaded, but stored in an external DHT network
+and locally cached.
+
+At genesis there is only a fully loaded world state, that is stored locally in
+the cache.
+
+The client will establish a p2p network... not fully described.
+
+It will then ask for blocks. Once it finds one that corresponds to the next block
+according to its world state, it will run it.
+
+That will validate/change the world state and score the world state.
+ -- Block scoring is outside of the world state. This is so a thin client can
+    grab the latest world state and verify only the headers of the block chains.
+    It can go backwards as much as it wants (ie become a fatter and fatter client
+    as much as it prefers), by validating blocks based on prior world state.
+ -- This also means that block changes must be reversable
+
+Then it will load the new world state.
+   -- world state will be stored in whiteboard.
+   -- only partial world state will normally be stored.
+
+Msgs received by other nodes will run against the world state. Txns get translated into a request to the local client by the world state
+ - notify client of something
+ - request to be put in the next block
+ - block published
+
+*** Block mining
+
+ - will take msgs to be put in the block and collect them
+ - will mine for blocks and send out the data.
+ - will need to load world state for any changes to validate it when
+   new world state is created (this is necessary so that any node connecting
+   to the network can see the latest world state without bothering to go
+   through all blocks)
+ - New block will be signed on a merkle root representing the new world state.
+ 
+   
+Local wedge. Anything that comes out of the world state will be a writer monad,
+a list of commands, basically.
+
+Between the actual client and this list of commands will be a local state that
+will further modify the list of commands, reject them, etc.
+
+ - Should local state be Turing complete?
+ - I think that messages that come in will be with a date
+ - Expressions in the local state can depend on data that comes in
+   and will be updated using white board. In other words, stats like
+   number of requests per second, etc. will be stored as expressions
+   based on incoming data. When that data changes the whiteboard changes as
+   well. (This may end up very complex, because it implies very fast changing
+   data.. whiteboard isn't necessarily designed for this)
+
+Subchains
+ -- What to do here?
+    -- Subchains should be writable in another language
+    -- Should be able to reference each other
+    -- Should depend on the root chain for security
+ -- What if we didn't have subchains, but sub blocks?
+ -- Or what if blocks didn't necessarily depend on each other...
+    -- blocks that work on separate data are separate.
+       This would ruin the ability to use another language.
+         -- unless one world state could support multiple languages at once
+	    --dependencies could only go one way, a newer language could support
+	      an older one, but not vice versa
+    -- A block could work on a sub tree only.
+       -- it'd then somehow need to update the rest of the chain.
+       -- Except then, different types of block chains couldn't be tried
+       -- unless the type of block would be independent of each other.
+    -- suppose each block had a "proof" section, and they were all independent.
+    -- the proof would be valid or invalid, and comparable to other blocks.
+       -- the client would have to recognize and support multiple proof types.
+
+Blocks as separate entities
+   -- interestingly, this means that blocks may not have a specific order. If
+      a block only works on a certain subset of the world state, it would be
+      independent of another block that works on a different subset.
+      The block would only hash against the merkle branches it changed.
+   -- Even if the type of proof a block used was unrecognized by a client, another
+      block that depended on the prior block with a proof that the client did
+      recognize could be used to pull in both blocks.
+
+World state as a collection of expressions. Each expression can be in its own language
+   -- Expressions can depend on each other as long as function (and dependencies) as written can be converted to the other language.
+   -- Each block as added validates the world state, depending on its proof.
+      -- changes to the world state by the block don't matter
+      -- a block is simply an expression that changes the world state
+         -- the expression contains a "proof" that can be anything, PoW, PoS,
+	    or whatever.
+         -- if the client recognizes the proof, then it will add it the evidence
+	    that the world state is correct.
+
+PoS
+  -- How this works will be tricky. It will have to be a combination of the core
+     and the world state working together to determine the proof. In other words,
+     the client must query the world state to find a balance or whatever, then
+     use that information to validate the block.
+
+P2P network
+  -- How can we have fast and slow blocks?
+  -- How can we limit the chattiness so that fast blocks will only be sent
+     to nodes that care?
+
+If a bunch of fast blocks occur, and need to be rolled into a slow block, how
+does this happen?
+  -- How can we prevent a slow parent block from having to execute all the fast
+     blocks in order to get to the proper state?
+  
+   
+2/3/18
+
+Sub chains
+  -- sub chains are just expressions with fees attached that build off of each other.
+     An expression may be written in a language not understood by root. This is ok, because
+     any participant that is concerned with that type of expression won't build off of illegal
+     ones. So even if an illegal expression (unreadble by root) gets placed into the root
+     block, it will be abandoned by future blocks.
+     -- But how can a block that rolls back a sub expression, not also require root to be rolled
+        back as well?
+	-- It seems that it can't. So maybe we can solve this issue by giving each sub expression
+	   a "domain". In other words, it's a complete and total update of a particular predicate
+	   of expressions (such as "key starts with 'facebookclone'", for example).
+	   All expressions of its subdomain are rewritten according to the expression.
+	   We'd probably have to require that subdomains can be represented by one or more
+	   merkle tree paths.
+
+	   Then, to rollback, we simply replace the subexpressions with the new merkle hash.
+
+Architecture:
+
+  There are multiple languages, some known, some not. There may be even just data.
+
+  We have a world state in which we can create a context (basically a bunch of let statements)
+  and an expression, and get the normalized result from that. In other words, if
+  the world state contains f.x:A -> g x, g.x:A -> x, and we call f Foo, we should get back
+  Foo.
+
+  Now, f and g may not be loaded into memory, and may not even be on the machine, but inside the
+  network.
+
+  Here is an expression from lennarts "simpler easier" lambda cube:
+
+  data Expr
+        = Var Sym
+        | App Expr Expr
+        | Lam Sym Type Expr
+        | Pi Sym Type Type
+        | Let Sym Type Expr Expr
+        | Kind Kind
+        deriving (Eq, Show)
+	
+   Here is morte's definition:
+
+   -- | Syntax tree for expressions
+   data Expr a
+    -- | > Const c        ~  c
+    = Const Const
+    -- | > Var (V x 0)    ~  x
+    --   > Var (V x n)    ~  x@n
+    | Var Var
+    -- | > Lam x     A b  ~  λ(x : A) → b
+    | Lam Text (Expr a) (Expr a)
+    -- | > Pi x      A B  ~  ∀(x : A) → B
+    --   > Pi unused A B  ~        A  → B
+    | Pi  Text (Expr a) (Expr a)
+    -- | > App f a        ~  f a
+    | App (Expr a) (Expr a)
+    -- | > Embed path     ~  #path
+    | Embed a
+    deriving (Functor, Foldable, Traversable, Show)
+
+   Embed is interesting... maybe we could use that for alternative languages
+   and random data.
+
+   Ok, so to start with, we need to represent if f isn't loaded.
+
+   So maybe we start with:
+   
+   -- | Syntax tree for expressions
+   data Expr a
+    -- | > Const c        ~  c
+    = Const Const
+    -- | > Var (V x 0)    ~  x
+    --   > Var (V x n)    ~  x@n
+    | Var Var
+    -- | > Lam x     A b  ~  λ(x : A) → b
+    | Lam Text (Expr a) (Expr a)
+    -- | > Pi x      A B  ~  ∀(x : A) → B
+    --   > Pi unused A B  ~        A  → B
+    | Pi  Text (Expr a) (Expr a)
+    -- | > App f a        ~  f a
+    | App (Expr a) (Expr a)
+    -- | > Embed path     ~  #path
+    | Embed a
+    | Unloaded
+    deriving (Functor, Foldable, Traversable, Show)
+
+   Unloaded items must be loadable. It shouldn't cause the whole tree
+   to be destroyed (ie, if a -> b -> c and c is modified , we
+   shouldn't have to create a' -> b' -> c'), so if we use
+   whiteboard...  Can whiteboard do this? Alter a tree of expressions
+   without reloading the entire tree?
+
+   Using whiteboard in its current form, we might be able to do something like
+
+   -- | Syntax tree for expressions
+   data Expr a
+    -- | > Const c        ~  c
+    = Const Const
+    -- | > Var (V x 0)    ~  x
+    --   > Var (V x n)    ~  x@n
+    | Var Var
+    -- | > Lam x     A b  ~  λ(x : A) → b
+    | Lam Text (Expr a) (Expr a)
+    -- | > Pi x      A B  ~  ∀(x : A) → B
+    --   > Pi unused A B  ~        A  → B
+    | Pi  Text (Expr a) (Expr a)
+    -- | > App f a        ~  f a
+    | App (Expr a) (Expr a)
+    -- | > Embed path     ~  #path
+    | Embed a
+    | Key  -- whiteboard key
+    | Unloaded
+    deriving (Functor, Foldable, Traversable, Show)
+
+   
